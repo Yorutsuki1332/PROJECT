@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Enhanced Face ID System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .video-container {
+            margin: 20px 0;
+            position: relative;
+        }
+        .video-stream {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        input[type="text"] {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #userList {
+            margin: 20px 0;
+            text-align: left;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        #messages {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+            min-height: 50px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Enhanced Face ID System</h1>
+    
+    <div class="video-container">
+        <img id="videoFeed" class="video-stream" alt="Camera Feed">
+        <div id="loading" class="loading">Loading camera...</div>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="userIdInput" placeholder="Enter User ID">
+        <button onclick="registerFace()">Register Face</button>
+        <button onclick="identifyFace()">Identify Face</button>
+        <button onclick="getUsers()">List Users</button>
+    </div>
+
+    <div id="messages"></div>
+    <div id="userList"></div>
+
+    <script>
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        function showMessage(message, isError = false) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.textContent = message;
+            messagesDiv.className = isError ? 'error' : 'success';
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function initializeVideoFeed() {
+            const videoFeed = document.getElementById('videoFeed');
+            showLoading(true);
+
+            // Set the video feed source with a timestamp to prevent caching
+            videoFeed.src = `/video_feed?t=${new Date().getTime()}`;
+
+            videoFeed.onload = function() {
+                showLoading(false);
+                retryCount = 0;
+            };
+
+            videoFeed.onerror = function() {
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(initializeVideoFeed, 2000);
+                } else {
+                    showLoading(false);
+                    showMessage('Failed to connect to camera. Please refresh the page.', true);
+                }
+            };
+        }
+
+        async function checkCamera() {
+            try {
+                const response = await fetch('/check_camera');
+                const data = await response.json();
+                if (!data.camera_working) {
+                    showMessage('Camera not working. Please check the connection.', true);
+                }
+            } catch (error) {
+                showMessage('Error checking camera status', true);
+            }
+        }
+
+        async function registerFace() {
+            const userId = document.getElementById('userIdInput').value;
+            if (!userId) {
+                showMessage('Please enter a User ID', true);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('user_id', userId);
+
+            try {
+                const response = await fetch('/register_face', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                showMessage(data.message, !data.success);
+            } catch (error) {
+                showMessage('Error registering face', true);
+            }
+        }
+
+        async function identifyFace() {
+            try {
+                const response = await fetch('/identify_face', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(`Matched user: ${data.user_id}`);
+                } else {
+                    showMessage('No match found', true);
+                }
+            } catch (error) {
+                showMessage('Error identifying face', true);
+            }
+        }
+
+        async function getUsers() {
+            try {
+                const response = await fetch('/get_users');
+                const data = await response.json();
+                const userList = document.getElementById('userList');
+                if (data.users.length > 0) {
+                    userList.innerHTML = '<h3>Registered Users:</h3><ul>' +
+                        data.users.map(user => `<li>${user}</li>`).join('') +
+                        '</ul>';
+                } else {
+                    userList.innerHTML = '<p>No users registered</p>';
+                }
+            } catch (error) {
+                showMessage('Error getting user list', true);
+            }
+        }
+
+        // Initialize video feed when page loads
+        window.onload = function() {
+            initializeVideoFeed();
+            checkCamera();
+        };
+    </script>
+</body>
+</html>

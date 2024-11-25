@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Data Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .current-data {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .data-item {
+            display: inline-block;
+            margin: 10px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            min-width: 200px;
+        }
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .charts {
+                grid-template-columns: 1fr;
+            }
+        }
+        .chart {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sensor Data Dashboard</h1>
+        
+        <div class="current-data">
+            <h2>Current Readings</h2>
+            <div class="data-item">
+                <h3>Temperature</h3>
+                <p id="temperature">--</p>
+            </div>
+            <div class="data-item">
+                <h3>Humidity</h3>
+                <p id="humidity">--</p>
+            </div>
+            <div class="data-item">
+                <h3>Light Level</h3>
+                <p id="light_level">--</p>
+            </div>
+            <div class="data-item">
+                <h3>Particle Level</h3>
+                <p id="particle_level">--</p>
+            </div>
+        </div>
+
+        <div class="charts">
+            <div class="chart">
+                <div id="temperatureChart"></div>
+            </div>
+            <div class="chart">
+                <div id="humidityChart"></div>
+            </div>
+            <div class="chart">
+                <div id="lightChart"></div>
+            </div>
+            <div class="chart">
+                <div id="particleChart"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateCurrentData() {
+            fetch('/get_current_data')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('temperature').textContent = 
+                        data.temperature ? data.temperature.toFixed(1) + '°C' : '--';
+                    document.getElementById('humidity').textContent = 
+                        data.humidity ? data.humidity.toFixed(1) + '%' : '--';
+                    document.getElementById('light_level').textContent = 
+                        data.light_level ? data.light_level.toFixed(1) + ' lux' : '--';
+                    document.getElementById('particle_level').textContent = 
+                        data.particle_level ? data.particle_level.toFixed(1) + ' μg/m³' : '--';
+                });
+        }
+
+        function updateHistoricalCharts() {
+            fetch('/get_historical_data')
+                .then(response => response.json())
+                .then(data => {
+                    const timestamps = data.map(d => d.timestamp);
+                    const temperatures = data.map(d => d.temperature);
+                    const humidities = data.map(d => d.humidity);
+                    const lightLevels = data.map(d => d.light_level);
+                    const particleLevels = data.map(d => d.particle_level);
+
+                    const createChart = (elementId, title, yData, yAxisTitle) => {
+                        Plotly.newPlot(elementId, [{
+                            x: timestamps,
+                            y: yData,
+                            type: 'scatter',
+                            mode: 'lines+markers'
+                        }], {
+                            title: title,
+                            xaxis: { title: 'Time' },
+                            yaxis: { title: yAxisTitle }
+                        });
+                    };
+
+                    createChart('temperatureChart', 'Temperature History', 
+                              temperatures, 'Temperature (°C)');
+                    createChart('humidityChart', 'Humidity History', 
+                              humidities, 'Humidity (%)');
+                    createChart('lightChart', 'Light Level History', 
+                              lightLevels, 'Light Level (lux)');
+                    createChart('particleChart', 'Particle Level History', 
+                              particleLevels, 'Particle Level (μg/m³)');
+                });
+        }
+
+        // Update data every 5 seconds
+        setInterval(updateCurrentData, 5000);
+        setInterval(updateHistoricalCharts, 5000);
+
+        // Initial update
+        updateCurrentData();
+        updateHistoricalCharts();
+    </script>
+</body>
+</html>
